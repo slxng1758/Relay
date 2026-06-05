@@ -1,2 +1,2 @@
 # Relay
-Multi-Agent AI for Operational Continuity During Team Transitions
+Multi-Agent AI for Continuity During Team Transitions
