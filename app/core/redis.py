@@ -38,7 +38,7 @@ async def close_redis() -> None:
 
 # ── ARQ worker pool (task queue) ──────────────────────────────────────────────
 
-def _parse_redis_settings(url: str) -> RedisSettings:
+def parse_redis_settings(url: str) -> RedisSettings:
     import urllib.parse
 
     parsed = urllib.parse.urlparse(url)
@@ -57,7 +57,7 @@ async def get_queue() -> ArqRedis:
     global _arq_pool
     if _arq_pool is None:
         _arq_pool = await create_pool(
-            _parse_redis_settings(settings.redis_queue_url)
+            parse_redis_settings(settings.redis_queue_url)
         )
     return _arq_pool
 

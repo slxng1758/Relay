@@ -54,10 +54,16 @@ class Settings(BaseSettings):
     agent_temperature: float = 0.2
     agent_max_tokens: int = 4096
 
+    # ── Security ─────────────────────────────────────────────────────────────
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 1440
+
     # ── Slack ─────────────────────────────────────────────────────────────────
     slack_bot_token: str = ""
     slack_app_token: str = ""
     slack_signing_secret: str = ""
+    # Comma-separated channel IDs to scan for decision-worthy messages
+    slack_decision_channel_ids: str = ""
 
     # ── GitHub ────────────────────────────────────────────────────────────────
     github_token: str = ""
@@ -67,6 +73,8 @@ class Settings(BaseSettings):
     jira_server: str = ""
     jira_email: str = ""
     jira_api_token: str = ""
+    # Comma-separated project keys to scope JQL search; empty = all accessible projects
+    jira_project_keys: str = ""
 
     # ── Google ────────────────────────────────────────────────────────────────
     google_service_account_json: str = ""
@@ -81,6 +89,14 @@ class Settings(BaseSettings):
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     vector_similarity_threshold: float = 0.75
     vector_top_k: int = 10
+
+    @property
+    def slack_decision_channel_id_list(self) -> list[str]:
+        return [c.strip() for c in self.slack_decision_channel_ids.split(",") if c.strip()]
+
+    @property
+    def jira_project_key_list(self) -> list[str]:
+        return [k.strip() for k in self.jira_project_keys.split(",") if k.strip()]
 
 
 @lru_cache
