@@ -19,8 +19,10 @@ ModelT = TypeVar("ModelT", bound=Base)
 class BaseRepository(Generic[ModelT]):
     model: type[ModelT]
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, model: type[ModelT] | None = None) -> None:
         self.session = session
+        if model is not None:
+            self.model = model  # type: ignore[assignment]
 
     async def get(self, id: uuid.UUID) -> ModelT | None:
         result = await self.session.execute(

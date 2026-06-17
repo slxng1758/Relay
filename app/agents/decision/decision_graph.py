@@ -6,7 +6,7 @@ reconstructs their context (who made them, what they blocked / superseded),
 and synthesises a coherent answer with a timeline.
 
 Graph flow:
-  embed_query → retrieve_decisions → enrich_context → build_timeline → answer → END
+  retrieve_decisions → enrich_context → build_timeline → answer → END
 """
 from __future__ import annotations
 
@@ -22,16 +22,8 @@ from app.core.logging import get_logger
 from app.db.models.nodes import Decision
 from app.db.repositories.edge_repository import EdgeRepository
 from app.db.models.edges import EdgeType
-from app.memory.vector.embedder import get_embedder
 
 logger = get_logger(__name__)
-
-
-async def embed_query(state: DecisionAgentState) -> DecisionAgentState:
-    """Embed the user query for similarity search."""
-    embedder = get_embedder()
-    vector = await embedder.embed_text(state["query"])
-    return {**state, "metadata": {**state.get("metadata", {}), "query_vector": vector}}
 
 
 async def retrieve_decisions(state: DecisionAgentState) -> DecisionAgentState:
@@ -139,14 +131,12 @@ Provide a clear, concise answer (4–6 sentences) that:
 def build_decision_graph() -> StateGraph:
     graph = StateGraph(DecisionAgentState)
 
-    graph.add_node("embed_query", embed_query)
     graph.add_node("retrieve_decisions", retrieve_decisions)
     graph.add_node("enrich_context", enrich_context)
     graph.add_node("build_timeline", build_timeline)
     graph.add_node("answer", answer)
 
-    graph.set_entry_point("embed_query")
-    graph.add_edge("embed_query", "retrieve_decisions")
+    graph.set_entry_point("retrieve_decisions")
     graph.add_edge("retrieve_decisions", "enrich_context")
     graph.add_edge("enrich_context", "build_timeline")
     graph.add_edge("build_timeline", "answer")

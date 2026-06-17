@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -22,30 +22,26 @@ async def embed_node(session: AsyncSession, node_id: uuid.UUID, node_type: str, 
     if not text.strip():
         return
 
-    embedder = get_embedder()
-    vector = await embedder.embed_text(text)
+    vector = await get_embedder().embed_text(text)
 
-    result = await session.execute(
-        select(NodeEmbedding).where(
-            NodeEmbedding.node_id == node_id, NodeEmbedding.node_type == node_type
+    stmt = (
+        pg_insert(NodeEmbedding)
+        .values(
+            node_id=node_id,
+            node_type=node_type,
+            text_content=text,
+            embedding=vector,
+            model_name=settings.embedding_model,
         )
-    )
-    existing = result.scalar_one_or_none()
-
-    if existing:
-        existing.text_content = text
-        existing.embedding = vector
-        existing.model_name = settings.embedding_model
-    else:
-        session.add(
-            NodeEmbedding(
-                node_id=node_id,
-                node_type=node_type,
+        .on_conflict_do_update(
+            index_elements=["node_id", "node_type"],
+            set_=dict(
                 text_content=text,
                 embedding=vector,
                 model_name=settings.embedding_model,
-            )
+            ),
         )
-
+    )
+    await session.execute(stmt)
     await session.flush()
     logger.debug("embedding_processor.embedded", node_id=str(node_id), node_type=node_type)

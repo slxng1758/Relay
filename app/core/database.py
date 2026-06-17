@@ -38,22 +38,9 @@ class Base(DeclarativeBase):
     pass
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency – yields a session and commits/rolls back on exit."""
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
-
-
 @asynccontextmanager
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Context-manager version for use outside FastAPI dependency injection."""
+    """Async context manager – commits on success, rolls back on exception."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -61,6 +48,12 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency wrapper around db_session."""
+    async with db_session() as session:
+        yield session
 
 
 async def init_db() -> None:

@@ -9,7 +9,7 @@ Scans the operational graph for risk signals:
   - Open decisions with no resolution > 30 days
 
 Graph flow:
-  collect_signals → score_signals → deduplicate → generate_report → END
+  collect_signals → score_signals → generate_report → END
 """
 from __future__ import annotations
 

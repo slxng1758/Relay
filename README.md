@@ -99,15 +99,16 @@ docker compose exec api opsgraph seed         # load sample data (optional)
 
 ### 3. Get an auth token
 
+`opsgraph tokens create <subject>` prints a signed JWT to stdout — capture it
+into a variable:
+
 ```bash
-docker compose exec api opsgraph tokens create demo-user
+TOKEN=$(docker compose exec api opsgraph tokens create demo-user | tr -d '\r')
 ```
 
 ### 4. Call an agent
 
 ```bash
-TOKEN=<paste token>
-
 # Find the seeded "auth-service" id, then ask the dependency agent about it
 curl -s "localhost:8000/api/graph/nodes/service" | jq
 

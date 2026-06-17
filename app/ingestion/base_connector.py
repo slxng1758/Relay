@@ -62,9 +62,9 @@ class BaseConnector(ABC):
         self, session: AsyncSession, model: type[Base], external_id: str
     ) -> Any | None:
         """Look up a node of `model` by (external_id, this connector's source_system)."""
-        repo: BaseRepository[Any] = BaseRepository(session)
-        repo.model = model
-        return await repo.get_by_external_id(external_id, str(self.source_system))
+        return await BaseRepository(session, model=model).get_by_external_id(
+            external_id, str(self.source_system)
+        )
 
     async def upsert_node(
         self,
@@ -74,9 +74,9 @@ class BaseConnector(ABC):
         **fields: Any,
     ) -> tuple[Any, bool]:
         """Insert or update a node of `model`, keyed on (external_id, source_system)."""
-        repo: BaseRepository[Any] = BaseRepository(session)
-        repo.model = model
-        return await repo.upsert_by_external_id(external_id, str(self.source_system), **fields)
+        return await BaseRepository(session, model=model).upsert_by_external_id(
+            external_id, str(self.source_system), **fields
+        )
 
     async def upsert_edge(
         self,

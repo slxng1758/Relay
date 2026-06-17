@@ -54,6 +54,9 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     logger.info("worker.shutdown")
 
 
+_POLL_MINUTES = _poll_minutes()
+
+
 class WorkerSettings:
     functions = [
         ingest_slack,
@@ -64,10 +67,10 @@ class WorkerSettings:
         process_github_event,
     ]
     cron_jobs = [
-        cron(ingest_slack, minute=_poll_minutes(), second=0),
-        cron(ingest_github, minute=_poll_minutes(), second=0),
-        cron(ingest_jira, minute=_poll_minutes(), second=0),
-        cron(ingest_gdocs, minute=_poll_minutes(), second=0),
+        cron(ingest_slack, minute=_POLL_MINUTES, second=0),
+        cron(ingest_github, minute=_POLL_MINUTES, second=0),
+        cron(ingest_jira, minute=_POLL_MINUTES, second=0),
+        cron(ingest_gdocs, minute=_POLL_MINUTES, second=0),
     ]
     redis_settings: RedisSettings = parse_redis_settings(settings.redis_queue_url)
     on_startup = startup
