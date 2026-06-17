@@ -2,64 +2,43 @@
 Decision Reconstruction Agent
 ──────────────────────────────
 Given a natural-language query, retrieves related decisions from the graph,
-reconstructs their context (who made them, what they blocked / superseded),
+reconstructs their context (who made them, what they superseded),
 and synthesises a coherent answer with a timeline.
-
-Graph flow:
-  retrieve_decisions → enrich_context → build_timeline → answer → END
 """
 from __future__ import annotations
 
 from typing import Any
 
-from langgraph.graph import END, StateGraph
 from sqlalchemy import select
 
-from app.agents.state import DecisionAgentState
+from app.agents.state import DecisionResult
 from app.core.database import db_session
-from app.core.llm import get_llm
+from app.core.llm import complete
 from app.core.logging import get_logger
+from app.db.models.edges import EdgeType
 from app.db.models.nodes import Decision
 from app.db.repositories.edge_repository import EdgeRepository
-from app.db.models.edges import EdgeType
 
 logger = get_logger(__name__)
 
 
-async def retrieve_decisions(state: DecisionAgentState) -> DecisionAgentState:
-    """Semantic search over decision embeddings, fallback to keyword match."""
+async def _retrieve(query: str) -> list[str]:
     from app.memory.retrieval.retriever import HybridRetriever
-
-    retriever = HybridRetriever()
-    results = await retriever.search(
-        query=state["query"],
-        node_types=["decision"],
-        top_k=10,
-    )
-    candidate_ids = [r["node_id"] for r in results]
-    logger.info("decision_agent.retrieved", count=len(candidate_ids))
-    return {**state, "candidate_decision_ids": candidate_ids}
+    results = await HybridRetriever().search(query=query, node_types=["decision"], top_k=10)
+    return [r["node_id"] for r in results]
 
 
-async def enrich_context(state: DecisionAgentState) -> DecisionAgentState:
-    """For each candidate decision, load edges (who decided, what it supersedes)."""
-    candidate_ids = state.get("candidate_decision_ids", [])
+async def _enrich(candidate_ids: list[str]) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
-
     async with db_session() as session:
         edge_repo = EdgeRepository(session)
-
-        for decision_id in candidate_ids[:8]:  # cap at 8 to stay in context budget
-            result = await session.execute(
-                select(Decision).where(Decision.id == decision_id)
-            )
-            decision = result.scalar_one_or_none()
+        for decision_id in candidate_ids[:8]:
+            row = await session.execute(select(Decision).where(Decision.id == decision_id))
+            decision = row.scalar_one_or_none()
             if not decision:
                 continue
-
             outgoing = await edge_repo.get_outgoing(decision_id)
             incoming = await edge_repo.get_incoming(decision_id)
-
             enriched.append({
                 "id": str(decision.id),
                 "title": decision.title,
@@ -76,44 +55,31 @@ async def enrich_context(state: DecisionAgentState) -> DecisionAgentState:
                     for e in incoming
                 ],
             })
+    return enriched
 
-    return {**state, "reconstructed_context": enriched}
 
-
-async def build_timeline(state: DecisionAgentState) -> DecisionAgentState:
-    """Sort decisions chronologically and mark supersession chains."""
-    context = state.get("reconstructed_context", [])
-    sorted_decisions = sorted(
-        context,
-        key=lambda d: d.get("decided_at") or "0000",
-    )
-
-    # Mark which decisions supersede others
-    for d in sorted_decisions:
+def _build_timeline(enriched: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    timeline = sorted(enriched, key=lambda d: d.get("decided_at") or "0000")
+    for d in timeline:
         d["superseded_by"] = [
             e["source_id"]
             for e in d.get("incoming_edges", [])
             if e["type"] == EdgeType.SUPERSEDES
         ]
+    return timeline
 
-    return {**state, "decision_timeline": sorted_decisions}
 
-
-async def answer(state: DecisionAgentState) -> DecisionAgentState:
-    """Use the LLM to synthesise a coherent answer from the timeline."""
-    llm = get_llm(temperature=0.2)
-
+async def _answer(query: str, timeline: list[dict[str, Any]]) -> str:
     timeline_text = "\n\n".join(
         f"[{d.get('decided_at', 'unknown date')}] {d['title']}\n"
         f"  Status: {d['status']}\n"
         f"  Summary: {d.get('summary', 'N/A')}\n"
         f"  Superseded by: {', '.join(d.get('superseded_by', [])) or 'none'}"
-        for d in state.get("decision_timeline", [])
+        for d in timeline
     )
-
     prompt = f"""You are an engineering knowledge assistant helping reconstruct decision history.
 
-User query: {state['query']}
+User query: {query}
 
 Decision timeline (chronological):
 {timeline_text or 'No decisions found matching this query.'}
@@ -124,25 +90,14 @@ Provide a clear, concise answer (4–6 sentences) that:
 3. Notes any decisions that were superseded or reversed
 4. Flags unresolved or open decisions that may need attention
 """
-    response = await llm.ainvoke(prompt)
-    return {**state, "answer": response.content}
+    return await complete(prompt, temperature=0.2)
 
 
-def build_decision_graph() -> StateGraph:
-    graph = StateGraph(DecisionAgentState)
-
-    graph.add_node("retrieve_decisions", retrieve_decisions)
-    graph.add_node("enrich_context", enrich_context)
-    graph.add_node("build_timeline", build_timeline)
-    graph.add_node("answer", answer)
-
-    graph.set_entry_point("retrieve_decisions")
-    graph.add_edge("retrieve_decisions", "enrich_context")
-    graph.add_edge("enrich_context", "build_timeline")
-    graph.add_edge("build_timeline", "answer")
-    graph.add_edge("answer", END)
-
-    return graph.compile()
-
-
-decision_agent = build_decision_graph()
+async def run_decision_agent(query: str) -> DecisionResult:
+    logger.info("decision_agent.start", query=query)
+    candidate_ids = await _retrieve(query)
+    enriched = await _enrich(candidate_ids)
+    timeline = _build_timeline(enriched)
+    answer = await _answer(query, timeline)
+    logger.info("decision_agent.done", decisions_found=len(timeline))
+    return DecisionResult(answer=answer, decision_timeline=timeline)

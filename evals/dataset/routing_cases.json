@@ -1,0 +1,122 @@
+[
+  {
+    "id": "r01",
+    "category": "single_tool",
+    "question": "What does auth-service depend on?",
+    "expected_tools": ["analyze_dependencies"]
+  },
+  {
+    "id": "r02",
+    "category": "single_tool",
+    "question": "What services does onboarding-service rely on? Would anything break if one of them went down?",
+    "expected_tools": ["analyze_dependencies"]
+  },
+  {
+    "id": "r03",
+    "category": "single_tool",
+    "question": "Why are we migrating from session-based auth to JWT?",
+    "expected_tools": ["query_decisions"]
+  },
+  {
+    "id": "r04",
+    "category": "single_tool",
+    "question": "What was the reasoning behind the JWT migration decision?",
+    "expected_tools": ["query_decisions"]
+  },
+  {
+    "id": "r05",
+    "category": "single_tool",
+    "question": "Are there any open architectural decisions that haven't been resolved yet?",
+    "expected_tools": ["query_decisions"]
+  },
+  {
+    "id": "r06",
+    "category": "single_tool",
+    "question": "What are the current risk signals across the organisation?",
+    "expected_tools": ["assess_risk"]
+  },
+  {
+    "id": "r07",
+    "category": "single_tool",
+    "question": "Which teams have bus-factor problems or unowned services?",
+    "expected_tools": ["assess_risk"]
+  },
+  {
+    "id": "r08",
+    "category": "single_tool",
+    "question": "What work is overdue or stale right now?",
+    "expected_tools": ["assess_risk"]
+  },
+  {
+    "id": "r09",
+    "category": "single_tool",
+    "question": "Generate an onboarding document for Alice Chen joining the Platform team.",
+    "expected_tools": ["generate_onboarding_doc"]
+  },
+  {
+    "id": "r10",
+    "category": "single_tool",
+    "question": "Bob Martinez is leaving the Platform team. Create a handoff document so his work isn't lost.",
+    "expected_tools": ["generate_onboarding_doc"]
+  },
+  {
+    "id": "r11",
+    "category": "single_tool",
+    "question": "Carla Singh is moving teams. Write an onboarding doc to get her up to speed on Growth.",
+    "expected_tools": ["generate_onboarding_doc"]
+  },
+  {
+    "id": "r12",
+    "category": "cross_tool",
+    "question": "auth-service is our most critical service. What does it depend on, and what decisions led to its current architecture?",
+    "expected_tools": ["analyze_dependencies", "query_decisions"]
+  },
+  {
+    "id": "r13",
+    "category": "cross_tool",
+    "question": "What's risky about the Platform team and what past engineering decisions contributed to that risk?",
+    "expected_tools": ["assess_risk", "query_decisions"]
+  },
+  {
+    "id": "r14",
+    "category": "cross_tool",
+    "question": "We're worried about onboarding-service reliability. What does it depend on and what are the overall risk signals?",
+    "expected_tools": ["analyze_dependencies", "assess_risk"]
+  },
+  {
+    "id": "r15",
+    "category": "cross_tool",
+    "question": "What's the blast radius if auth-service goes down, and what was the reasoning behind the JWT migration?",
+    "expected_tools": ["analyze_dependencies", "query_decisions"]
+  },
+  {
+    "id": "r16",
+    "category": "cross_tool",
+    "question": "Generate an onboarding doc for the Growth team and tell me what risks to flag to the new hire.",
+    "expected_tools": ["generate_onboarding_doc", "assess_risk"]
+  },
+  {
+    "id": "r17",
+    "category": "cross_tool",
+    "question": "Before Alice Chen's handoff, summarise the risk signals for the Platform team and tell me what decisions she was involved in.",
+    "expected_tools": ["assess_risk", "query_decisions"]
+  },
+  {
+    "id": "r18",
+    "category": "edge",
+    "question": "Hello, what can you help me with?",
+    "expected_tools": []
+  },
+  {
+    "id": "r19",
+    "category": "edge",
+    "question": "How many teams are in the organisation?",
+    "expected_tools": ["assess_risk"]
+  },
+  {
+    "id": "r20",
+    "category": "edge",
+    "question": "Has the JWT migration decision been superseded by anything newer?",
+    "expected_tools": ["query_decisions"]
+  }
+]

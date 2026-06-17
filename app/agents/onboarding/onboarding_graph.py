@@ -4,159 +4,125 @@ Onboarding / Handoff Document Agent
 Given a person + team, gathers all relevant graph context and generates
 a structured onboarding or handoff document in Markdown.
 
-Graph flow:
-  load_person_context → load_team_context → gather_open_work →
-  gather_decisions → draft_document → refine → END
+Agent-to-agent: for each service the team owns, calls the dependency agent
+to include real dependency chain context in the generated document.
+Capped at 3 services to bound latency.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from langgraph.graph import END, StateGraph
 from sqlalchemy import select
 
-from app.agents.state import OnboardingAgentState
+from app.agents.state import OnboardingResult
 from app.core.database import db_session
-from app.core.llm import get_llm
+from app.core.llm import complete
 from app.core.logging import get_logger
-from app.db.models.nodes import Person, Team, Task, Decision, Service
 from app.db.models.edges import EdgeType
+from app.db.models.nodes import Decision, Person, Service, Task, Team
 from app.db.repositories.edge_repository import EdgeRepository
 
 logger = get_logger(__name__)
 
 
-async def load_person_context(state: OnboardingAgentState) -> OnboardingAgentState:
-    """Load the person node and their direct edges."""
-    person_id = state["person_id"]
+async def _load_person(person_id: str) -> list[dict[str, Any]]:
     context: list[dict[str, Any]] = []
-
     async with db_session() as session:
-        result = await session.execute(select(Person).where(Person.id == person_id))
-        person = result.scalar_one_or_none()
-
-        if person:
-            context.append({
-                "type": "person",
-                "id": str(person.id),
-                "name": person.display_name,
-                "email": person.email,
-                "github": person.github_login,
-            })
-
-            # What does this person own?
-            edge_repo = EdgeRepository(session)
-            owns = await edge_repo.get_outgoing(person.id, EdgeType.OWNS)
-            context.extend([
-                {"type": "ownership", "target_id": str(e.target_id), "target_type": e.target_type}
-                for e in owns
-            ])
-
-    return {**state, "context_nodes": context}
+        row = await session.execute(select(Person).where(Person.id == person_id))
+        person = row.scalar_one_or_none()
+        if not person:
+            return context
+        context.append({
+            "type": "person", "id": str(person.id),
+            "name": person.display_name, "email": person.email,
+            "github": person.github_login,
+        })
+        owns = await EdgeRepository(session).get_outgoing(person.id, EdgeType.OWNS)
+        context.extend(
+            {"type": "ownership", "target_id": str(e.target_id), "target_type": e.target_type}
+            for e in owns
+        )
+    return context
 
 
-async def load_team_context(state: OnboardingAgentState) -> OnboardingAgentState:
-    """Load team services, members, and active repos."""
-    team_id = state["team_id"]
-    context = state.get("context_nodes", [])
-
+async def _load_team(team_id: str) -> list[dict[str, Any]]:
+    context: list[dict[str, Any]] = []
     async with db_session() as session:
-        result = await session.execute(select(Team).where(Team.id == team_id))
-        team = result.scalar_one_or_none()
-
+        row = await session.execute(select(Team).where(Team.id == team_id))
+        team = row.scalar_one_or_none()
         if team:
             context.append({
-                "type": "team",
-                "id": str(team.id),
-                "name": team.name,
-                "slack_channel": team.slack_channel_id,
+                "type": "team", "id": str(team.id),
+                "name": team.name, "slack_channel": team.slack_channel_id,
             })
 
-        # Services owned by team
-        result = await session.execute(
-            select(Service).where(Service.owner_team_id == team_id)
-        )
-        for svc in result.scalars():
+        for svc in (await session.execute(select(Service).where(Service.owner_team_id == team_id))).scalars():
             context.append({
-                "type": "service",
-                "id": str(svc.id),
-                "name": svc.name,
-                "status": svc.status,
-                "repo_url": svc.repo_url,
+                "type": "service", "id": str(svc.id),
+                "name": svc.name, "status": svc.status, "repo_url": svc.repo_url,
             })
 
-        # Members
-        result = await session.execute(
-            select(Person).where(Person.team_id == team_id)
-        )
-        for member in result.scalars():
+        for member in (await session.execute(select(Person).where(Person.team_id == team_id))).scalars():
             context.append({
-                "type": "team_member",
-                "id": str(member.id),
-                "name": member.display_name,
-                "email": member.email,
+                "type": "team_member", "id": str(member.id),
+                "name": member.display_name, "email": member.email,
             })
 
-    return {**state, "context_nodes": context}
+    return context
 
 
-async def gather_open_work(state: OnboardingAgentState) -> OnboardingAgentState:
-    """Load open/in-progress tasks assigned to this team."""
-    team_id = state["team_id"]
-    context = state.get("context_nodes", [])
-
+async def _gather_open_work(team_id: str) -> list[dict[str, Any]]:
     async with db_session() as session:
-        result = await session.execute(
-            select(Task).where(
-                Task.team_id == team_id,
-                Task.status.in_(["open", "in_progress"]),
-            ).limit(20)
+        rows = await session.execute(
+            select(Task)
+            .where(Task.team_id == team_id, Task.status.in_(["open", "in_progress"]))
+            .limit(20)
         )
-        for task in result.scalars():
-            context.append({
-                "type": "open_task",
-                "id": str(task.id),
-                "title": task.title,
-                "status": task.status,
-                "priority": task.priority,
-                "jira_key": task.jira_key,
-                "due_date": task.due_date.isoformat() if task.due_date else None,
-            })
-
-    return {**state, "context_nodes": context}
+        return [
+            {
+                "type": "open_task", "id": str(t.id), "title": t.title,
+                "status": t.status, "priority": t.priority, "jira_key": t.jira_key,
+                "due_date": t.due_date.isoformat() if t.due_date else None,
+            }
+            for t in rows.scalars()
+        ]
 
 
-async def gather_decisions(state: OnboardingAgentState) -> OnboardingAgentState:
-    """Load recent open decisions relevant to this team's services."""
-    context = state.get("context_nodes", [])
-    service_ids = [c["id"] for c in context if c["type"] == "service"]
-
-    if not service_ids:
-        return state
-
+async def _gather_decisions() -> list[dict[str, Any]]:
     async with db_session() as session:
-        result = await session.execute(
-            select(Decision).where(Decision.status == "open").limit(10)
-        )
-        for dec in result.scalars():
-            context.append({
-                "type": "open_decision",
-                "id": str(dec.id),
-                "title": dec.title,
-                "summary": dec.summary,
-                "source_url": dec.source_url,
-            })
-
-    return {**state, "context_nodes": context}
+        rows = await session.execute(select(Decision).where(Decision.status == "open").limit(10))
+        return [
+            {
+                "type": "open_decision", "id": str(d.id),
+                "title": d.title, "summary": d.summary, "source_url": d.source_url,
+            }
+            for d in rows.scalars()
+        ]
 
 
-async def draft_document(state: OnboardingAgentState) -> OnboardingAgentState:
-    """Generate the full document draft using the LLM."""
-    llm = get_llm(temperature=0.3)
-    doc_type = state.get("doc_type", "onboarding")
-    context = state.get("context_nodes", [])
+async def _enrich_services_with_dependencies(context: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Agent-to-agent call: for each service the team owns, run the dependency
+    agent and attach a summary + risk score to the service context entry.
+    Capped at 3 services to bound latency.
+    """
+    from app.agents.dependency.dependency_graph import run_dependency_agent
 
-    # Bucket context by type for the prompt
+    services = [c for c in context if c["type"] == "service"][:3]
+    for svc in services:
+        logger.info("onboarding_agent.consulting_dependency_agent", service=svc["name"])
+        try:
+            dep_result = await run_dependency_agent(svc["id"])
+            svc["dependency_summary"] = dep_result.summary
+            svc["dependency_risk_score"] = dep_result.risk_score
+            svc["circular_deps"] = dep_result.circular_deps
+        except Exception as exc:
+            logger.warning("onboarding_agent.dependency_lookup_failed", service=svc["id"], error=str(exc))
+
+    return context
+
+
+async def _draft(doc_type: str, context: list[dict[str, Any]]) -> str:
     team_info = [c for c in context if c["type"] == "team"]
     members = [c for c in context if c["type"] == "team_member"]
     services = [c for c in context if c["type"] == "service"]
@@ -168,7 +134,7 @@ async def draft_document(state: OnboardingAgentState) -> OnboardingAgentState:
         instruction = """Generate a comprehensive onboarding document for a new team member. Include:
 ## Welcome to the Team
 ## Team Overview (members, mission, Slack channel)
-## Services We Own (with repo links and status)
+## Services We Own (with repo links, status, dependency summary, and risk score)
 ## Your First Week (what to read, who to meet, what to set up)
 ## Open Work (current priorities and in-flight tasks)
 ## Open Decisions (decisions the team is currently working through)
@@ -176,7 +142,7 @@ async def draft_document(state: OnboardingAgentState) -> OnboardingAgentState:
     else:
         instruction = """Generate a handoff document for someone leaving the team. Include:
 ## Handoff Overview
-## Services Owned (status, known issues, runbook links)
+## Services Owned (status, dependency chains, known risks, runbook links)
 ## In-Flight Work (tasks, owners, next steps)
 ## Open Decisions (context, options considered, recommended path)
 ## Key Relationships (stakeholders, dependencies on other teams)
@@ -187,51 +153,41 @@ async def draft_document(state: OnboardingAgentState) -> OnboardingAgentState:
 Context data:
 Team: {team_info}
 Members: {members}
-Services: {services}
+Services (with dependency context): {services}
 Open tasks: {open_tasks}
 Open decisions: {decisions}
 Person: {person_info}
 
-Write the full document in clean Markdown. Be specific — use real names, task titles, and service names from the context.
+Write the full document in clean Markdown. Be specific — use real names, task titles, service names, and dependency details from the context.
 """
-    response = await llm.ainvoke(prompt)
-    return {**state, "draft": response.content}
+    return await complete(prompt, temperature=0.3)
 
 
-async def refine_document(state: OnboardingAgentState) -> OnboardingAgentState:
-    """Light editing pass: fix formatting, ensure all sections are present."""
-    llm = get_llm(temperature=0.1)
-    draft = state.get("draft", "")
-
-    prompt = f"""Review and lightly edit this {state.get('doc_type', 'onboarding')} document.
+async def _refine(doc_type: str, draft: str) -> str:
+    prompt = f"""Review and lightly edit this {doc_type} document.
 Fix any formatting issues, ensure all section headers are present and consistent,
 and make sure the tone is clear and direct. Return only the final Markdown document.
 
 {draft}"""
-
-    response = await llm.ainvoke(prompt)
-    return {**state, "final_document": response.content}
+    return await complete(prompt, temperature=0.1)
 
 
-def build_onboarding_graph() -> StateGraph:
-    graph = StateGraph(OnboardingAgentState)
+async def run_onboarding_agent(
+    person_id: str,
+    team_id: str,
+    doc_type: str = "onboarding",
+) -> OnboardingResult:
+    logger.info("onboarding_agent.start", person_id=person_id, team_id=team_id, doc_type=doc_type)
 
-    graph.add_node("load_person_context", load_person_context)
-    graph.add_node("load_team_context", load_team_context)
-    graph.add_node("gather_open_work", gather_open_work)
-    graph.add_node("gather_decisions", gather_decisions)
-    graph.add_node("draft_document", draft_document)
-    graph.add_node("refine_document", refine_document)
+    context: list[dict[str, Any]] = []
+    context.extend(await _load_person(person_id))
+    context.extend(await _load_team(team_id))
+    context = await _enrich_services_with_dependencies(context)
+    context.extend(await _gather_open_work(team_id))
+    context.extend(await _gather_decisions())
 
-    graph.set_entry_point("load_person_context")
-    graph.add_edge("load_person_context", "load_team_context")
-    graph.add_edge("load_team_context", "gather_open_work")
-    graph.add_edge("gather_open_work", "gather_decisions")
-    graph.add_edge("gather_decisions", "draft_document")
-    graph.add_edge("draft_document", "refine_document")
-    graph.add_edge("refine_document", END)
+    draft = await _draft(doc_type, context)
+    final = await _refine(doc_type, draft)
 
-    return graph.compile()
-
-
-onboarding_agent = build_onboarding_graph()
+    logger.info("onboarding_agent.done", doc_type=doc_type)
+    return OnboardingResult(final_document=final)

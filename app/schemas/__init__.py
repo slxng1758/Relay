@@ -1,5 +1,7 @@
 """Re-exports request/response schemas for `from app.schemas import ...` imports."""
 from app.schemas.agents import (
+    CoordinatorRequest,
+    CoordinatorResponse,
     DecisionQueryRequest,
     DecisionQueryResponse,
     DependencyRequest,
@@ -14,6 +16,8 @@ from app.schemas.health import HealthResponse
 from app.schemas.ingestion import IngestionStatusResponse, IngestionTriggerRequest
 
 __all__ = [
+    "CoordinatorRequest",
+    "CoordinatorResponse",
     "DecisionQueryRequest",
     "DecisionQueryResponse",
     "DependencyRequest",

@@ -1,4 +1,5 @@
 """Request/response schemas for the agent-trigger endpoints in app/api/routes/agents.py."""
+
 from __future__ import annotations
 
 import uuid
@@ -62,4 +63,15 @@ class OnboardingResponse(BaseModel):
     team_id: uuid.UUID
     doc_type: str
     document: str
+    run_id: str
+
+
+# ── Coordinator ───────────────────────────────────────────────────────────────
+
+class CoordinatorRequest(BaseModel):
+    question: str
+
+
+class CoordinatorResponse(BaseModel):
+    answer: str
     run_id: str

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "ret01",
+    "query": "JWT session migration stateless authentication",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Core terminology match — title + summary should both score high"
+  },
+  {
+    "id": "ret02",
+    "query": "why did we move away from session tokens",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Paraphrase of intent, no keyword overlap — tests semantic retrieval"
+  },
+  {
+    "id": "ret03",
+    "query": "authentication strategy change",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Broad query — should still retrieve the only auth decision"
+  },
+  {
+    "id": "ret04",
+    "query": "horizontal scaling auth service scalability",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Inferred motivation — stateless JWTs are often adopted for horizontal scaling"
+  },
+  {
+    "id": "ret05",
+    "query": "open decisions that need resolution",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "The JWT migration is open status — should surface as an unresolved decision"
+  },
+  {
+    "id": "ret06",
+    "query": "security token architecture",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Security + token framing — tests cross-domain semantic match"
+  },
+  {
+    "id": "ret07",
+    "query": "Alice Chen architectural decision",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Alice is the decision-maker — tests whether person-to-decision edges are indexed"
+  },
+  {
+    "id": "ret08",
+    "query": "Platform team technical decision",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Platform team owns auth-service which the decision pertains to"
+  },
+  {
+    "id": "ret09",
+    "query": "roll out to staging deployment plan",
+    "relevant_decision_titles": ["Migrate session auth to JWT"],
+    "note": "Bob's PLAT-456 task is 'Roll out JWT auth to staging' — retriever should surface the decision"
+  },
+  {
+    "id": "ret10",
+    "query": "completely unrelated query about infrastructure costs",
+    "relevant_decision_titles": [],
+    "note": "Negative case — no decisions should be retrieved above threshold"
+  }
+]

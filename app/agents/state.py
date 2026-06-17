@@ -1,62 +1,33 @@
 """
-Shared LangGraph state schemas.
-All agents use TypedDict state so the graph can be typed end-to-end.
+Return types for each specialist agent.
+Simple dataclasses — no framework dependency.
 """
 from __future__ import annotations
 
-from typing import Any, Annotated
-from typing_extensions import TypedDict
-
-from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage
+from dataclasses import dataclass, field
+from typing import Any
 
 
-# ── Base operational state ────────────────────────────────────────────────────
-
-class BaseAgentState(TypedDict, total=False):
-    """Minimal state every agent graph shares."""
-    run_id: str                          # UUID for this agent run
-    messages: Annotated[list[BaseMessage], add_messages]
-    error: str | None
-    metadata: dict[str, Any]
+@dataclass
+class DependencyResult:
+    dependency_chain: list[dict[str, Any]] = field(default_factory=list)
+    circular_deps: list[list[str]] = field(default_factory=list)
+    risk_score: float = 0.0
+    summary: str = ""
 
 
-# ── Dependency agent state ────────────────────────────────────────────────────
-
-class DependencyAgentState(BaseAgentState, total=False):
-    target_service_id: str              # UUID of the service to analyse
-    dependency_chain: list[dict[str, Any]]
-    circular_deps: list[list[str]]
-    risk_score: float
-    summary: str
+@dataclass
+class DecisionResult:
+    answer: str = ""
+    decision_timeline: list[dict[str, Any]] = field(default_factory=list)
 
 
-# ── Decision agent state ──────────────────────────────────────────────────────
-
-class DecisionAgentState(BaseAgentState, total=False):
-    query: str                          # Natural language question
-    candidate_decision_ids: list[str]
-    reconstructed_context: list[dict[str, Any]]
-    decision_timeline: list[dict[str, Any]]
-    answer: str
+@dataclass
+class RiskResult:
+    risk_items: list[dict[str, Any]] = field(default_factory=list)
+    report: str = ""
 
 
-# ── Risk agent state ──────────────────────────────────────────────────────────
-
-class RiskAgentState(BaseAgentState, total=False):
-    scope: str                          # "team" | "service" | "global"
-    scope_id: str | None
-    signals: list[dict[str, Any]]       # raw risk signals collected
-    risk_items: list[dict[str, Any]]    # structured {risk, severity, recommendation}
-    report: str
-
-
-# ── Onboarding agent state ────────────────────────────────────────────────────
-
-class OnboardingAgentState(BaseAgentState, total=False):
-    person_id: str
-    team_id: str
-    doc_type: str                       # "onboarding" | "handoff"
-    context_nodes: list[dict[str, Any]]
-    draft: str
-    final_document: str
+@dataclass
+class OnboardingResult:
+    final_document: str = ""

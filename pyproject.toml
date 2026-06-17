@@ -16,12 +16,8 @@ dependencies = [
     "uvicorn[standard]>=0.29.0",
     "httpx>=0.27.0",
 
-    # LangGraph / LangChain
-    "langgraph>=0.1.0",
-    "langchain>=0.2.0",
-    "langchain-openai>=0.1.0",
-    "langchain-anthropic>=0.1.0",
-    "langchain-community>=0.2.0",
+    # LLM
+    "anthropic>=0.40.0",
 
     # Database
     "sqlalchemy[asyncio]>=2.0.0",
@@ -29,12 +25,8 @@ dependencies = [
     "alembic>=1.13.0",
     "psycopg2-binary>=2.9.0",
 
-    # Graph database (Neo4j optional layer)
-    "neo4j>=5.20.0",
-
     # Redis / queues
     "redis[hiredis]>=5.0.0",
-    "rq>=1.16.0",
     "arq>=0.26.0",
 
     # Vector store

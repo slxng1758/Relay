@@ -1,0 +1,66 @@
+[
+  {
+    "id": "ans01",
+    "agent": "decision",
+    "question": "Why are we migrating from session-based auth to JWT?",
+    "expected_themes": ["JWT", "session", "stateless", "migration", "auth-service"],
+    "should_cite": ["Migrate session auth to JWT"],
+    "should_not_hallucinate": ["specific engineer names not in the decision record"]
+  },
+  {
+    "id": "ans02",
+    "agent": "decision",
+    "question": "What is the current status of the JWT migration?",
+    "expected_themes": ["open", "unresolved", "staging", "JWT"],
+    "should_cite": ["Migrate session auth to JWT"],
+    "should_not_hallucinate": []
+  },
+  {
+    "id": "ans03",
+    "agent": "risk",
+    "question": "What are the key risk signals for the Platform team right now?",
+    "expected_themes": ["Platform", "auth-service", "JWT", "Bob", "Alice"],
+    "should_cite": [],
+    "should_not_hallucinate": ["team names that don't exist"]
+  },
+  {
+    "id": "ans04",
+    "agent": "risk",
+    "question": "Give me a global risk assessment of the organisation.",
+    "expected_themes": ["auth-service", "onboarding-service", "Platform", "Growth"],
+    "should_cite": [],
+    "should_not_hallucinate": []
+  },
+  {
+    "id": "ans05",
+    "agent": "decision",
+    "question": "What engineering decisions has the Platform team made recently?",
+    "expected_themes": ["JWT", "auth", "Platform"],
+    "should_cite": ["Migrate session auth to JWT"],
+    "should_not_hallucinate": ["decisions that don't exist in the database"]
+  },
+  {
+    "id": "ans06",
+    "agent": "decision",
+    "question": "Are there any architectural decisions that are blocking work right now?",
+    "expected_themes": ["open", "JWT", "staging"],
+    "should_cite": ["Migrate session auth to JWT"],
+    "should_not_hallucinate": []
+  },
+  {
+    "id": "ans07",
+    "agent": "risk",
+    "question": "Which services are at risk and why?",
+    "expected_themes": ["auth-service", "onboarding-service", "dependency", "risk"],
+    "should_cite": [],
+    "should_not_hallucinate": ["service names that don't exist"]
+  },
+  {
+    "id": "ans08",
+    "agent": "decision",
+    "question": "Who decided to migrate to JWT and when?",
+    "expected_themes": ["Alice", "JWT", "decided", "open"],
+    "should_cite": ["Migrate session auth to JWT"],
+    "should_not_hallucinate": ["incorrect dates", "wrong decision-makers"]
+  }
+]
